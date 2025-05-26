@@ -23,8 +23,12 @@ public class Componente extends View {
     private Bitmap imagemAtual;
 
     private Bitmap imagemPedra, imagemMoeda, imagemCoracao;
-    private final int BONECO_LARGURA = 100;
-    private final int BONECO_ALTURA = 120;
+    private final int BONECO_LARGURA = 120;
+    private final int BONECO_ALTURA = 150;
+
+    private final int POSICAO_INICIAL_X = 300;
+    private final int POSICAO_INICIAL_Y = 700;
+
 
     private ArrayList<Pedra> pedras = new ArrayList<>();
     private ArrayList<Moeda> moedas = new ArrayList<>();
@@ -111,8 +115,8 @@ public class Componente extends View {
         imagemCoracao = BitmapFactory.decodeResource(context.getResources(), R.drawable.coracao);
         imagemCoracao = Bitmap.createScaledBitmap(imagemCoracao, 60, 60, true);
 
-        x = 100;
-        y = 100;
+        x = POSICAO_INICIAL_X;
+        y = POSICAO_INICIAL_Y;
 
         postDelayed(new Runnable() {
             @Override
@@ -245,8 +249,8 @@ public class Componente extends View {
         pontos = 0;
         tempo = 0;
         dificuldade = 0;
-        x = 100;
-        y = 100;
+        x = POSICAO_INICIAL_X;
+        y = POSICAO_INICIAL_Y;
         pedras.clear();
         moedas.clear();
         coracoes.clear();
