@@ -1,10 +1,14 @@
 package com.nicolas.jogo_bolinha;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.Rect;
+import android.graphics.Typeface;
+import android.media.SoundPool;
 import android.os.Handler;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
@@ -22,6 +26,9 @@ public class Componente extends View {
     private Bitmap parado, cima, baixo, esquerda, direita;
     private Bitmap imagemAtual;
 
+    private Bitmap imagemFundo;
+
+
     private Bitmap imagemPedra, imagemMoeda, imagemCoracao;
     private final int BONECO_LARGURA = 120;
     private final int BONECO_ALTURA = 150;
@@ -29,6 +36,9 @@ public class Componente extends View {
     private final int POSICAO_INICIAL_X = 300;
     private final int POSICAO_INICIAL_Y = 700;
 
+    private SoundPool soundPool;
+    private int somDeMoeda, somDeDano, somDeVida, somDeDerrota, somDeFundo;
+    private int streamIdFundo = 0;
 
     private ArrayList<Pedra> pedras = new ArrayList<>();
     private ArrayList<Moeda> moedas = new ArrayList<>();
@@ -98,11 +108,20 @@ public class Componente extends View {
         esquerda = BitmapFactory.decodeResource(context.getResources(), R.drawable.esquerda);
         direita = BitmapFactory.decodeResource(context.getResources(), R.drawable.direita);
 
+        imagemFundo = BitmapFactory.decodeResource(context.getResources(), R.drawable.bg);
+
         parado = Bitmap.createScaledBitmap(parado, BONECO_LARGURA, BONECO_ALTURA, true);
         cima = Bitmap.createScaledBitmap(cima, BONECO_LARGURA, BONECO_ALTURA, true);
         baixo = Bitmap.createScaledBitmap(baixo, BONECO_LARGURA, BONECO_ALTURA, true);
         esquerda = Bitmap.createScaledBitmap(esquerda, BONECO_LARGURA, BONECO_ALTURA, true);
         direita = Bitmap.createScaledBitmap(direita, BONECO_LARGURA, BONECO_ALTURA, true);
+
+        soundPool = new SoundPool.Builder().setMaxStreams(4).build();
+        somDeMoeda = soundPool.load(context, R.raw.moeda, 1);
+        somDeDano = soundPool.load(context, R.raw.pedra, 1);
+        somDeVida = soundPool.load(context, R.raw.vida, 1);
+        somDeDerrota = soundPool.load(context, R.raw.derrota, 1);
+        somDeFundo = soundPool.load(context, R.raw.fundo, 1);
 
         imagemAtual = parado;
 
@@ -117,6 +136,15 @@ public class Componente extends View {
 
         x = POSICAO_INICIAL_X;
         y = POSICAO_INICIAL_Y;
+
+        soundPool.setOnLoadCompleteListener(new SoundPool.OnLoadCompleteListener() {
+            @Override
+            public void onLoadComplete(SoundPool soundPool, int sampleId, int status) {
+                if (status == 0 && sampleId == somDeFundo) {
+                    streamIdFundo = soundPool.play(somDeFundo, 0.3f, 0.3f, 0, -1, 1f);
+                }
+            }
+        });
 
         postDelayed(new Runnable() {
             @Override
@@ -133,8 +161,14 @@ public class Componente extends View {
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
 
-        paint.setARGB(255, 100, 100, 120);
-        canvas.drawRect(0, 0, getWidth(), getHeight(), paint);
+        if (imagemFundo != null) {
+            @SuppressLint("DrawAllocation") Rect destino = new Rect(0, 0, getWidth(), getHeight());
+            canvas.drawBitmap(imagemFundo, null, destino, null);
+        } else {
+            // Se a imagem não carregou, pinta o fundo de cinza (fallback)
+            paint.setARGB(255, 100, 100, 120);
+            canvas.drawRect(0, 0, getWidth(), getHeight(), paint);
+        }
 
         canvas.drawBitmap(imagemAtual, x, y, null);
 
@@ -149,6 +183,7 @@ public class Componente extends View {
             if (pedra.y > getHeight()) itPedra.remove();
             if (colidiu(pedra.x, pedra.y, imagemPedra)) {
                 itPedra.remove();
+                soundPool.play(somDeDano, 1, 1, 0, 0, 1);
                 vidas--;
                 if (vidas <= 0) gameOver = true;
             }
@@ -161,6 +196,7 @@ public class Componente extends View {
             if (moeda.y > getHeight()) itMoeda.remove();
             if (colidiu(moeda.x, moeda.y, imagemMoeda)) {
                 itMoeda.remove();
+                soundPool.play(somDeMoeda, 1, 1, 0, 0, 1);
                 pontos++;
             }
         }
@@ -172,20 +208,50 @@ public class Componente extends View {
             if (coracao.y > getHeight()) itCoracao.remove();
             if (colidiu(coracao.x, coracao.y, imagemCoracao)) {
                 itCoracao.remove();
-                if (vidas < 5) vidas++; // Máximo 5 vidas
+                if (vidas < 5) {
+                    vidas++;
+                    soundPool.play(somDeVida, 1, 1, 0, 0, 1);
+                }
             }
         }
 
         paint.setARGB(255, 255, 255, 255);
         paint.setTextSize(40);
-        canvas.drawText("Vidas: " + vidas, 30, 50, paint);
-        canvas.drawText("Pontos: " + pontos, 30, 100, paint);
-        canvas.drawText("Tempo: " + tempo + "s", 30, 150, paint);
+        paint.setTypeface(Typeface.create(Typeface.DEFAULT_BOLD, Typeface.BOLD));
+
+        int larguraTela = getWidth();
+
+        int posYLinhaTopo = 30;
+
+        int espacamentoCoracao = imagemCoracao.getWidth() + 10;
+
+        for (int i = 0; i < vidas; i++) {
+            int posXCoracao = larguraTela - ((i + 1) * espacamentoCoracao) - 30;
+            canvas.drawBitmap(imagemCoracao, posXCoracao, posYLinhaTopo, null);
+        }
+
+        int posXMoeda = 30;
+        canvas.drawBitmap(imagemMoeda, posXMoeda, posYLinhaTopo, null);
+
+        int posXTextoPontos = posXMoeda + imagemMoeda.getWidth() + 10;
+        int posYTextoPontos = posYLinhaTopo + imagemMoeda.getHeight() - 10;
+        canvas.drawText(String.valueOf(pontos), posXTextoPontos, posYTextoPontos, paint);
+
+        int posXTempo = 30;
+        int posYTempo = posYLinhaTopo + imagemMoeda.getHeight() + 60;
+        canvas.drawText("Tempo: " + tempo + "s", posXTempo, posYTempo, paint);
 
         if (gameOver) {
+            soundPool.stop(streamIdFundo);
+            soundPool.play(somDeDerrota, 0.6f, 0.6f, 0, 0, 1);
+
             paint.setTextSize(100);
             paint.setARGB(255, 255, 0, 0);
             canvas.drawText("Game Over", getWidth() / 4f, getHeight() / 2f, paint);
+
+            paint.setTextSize(50);
+            paint.setARGB(255, 255, 255, 255);
+            canvas.drawText("Pontuação final: " + pontos, getWidth() / 4f, getHeight() / 2f + 180, paint);
 
             paint.setTextSize(60);
             paint.setARGB(255, 255, 255, 0);
@@ -255,6 +321,8 @@ public class Componente extends View {
         moedas.clear();
         coracoes.clear();
         gameOver = false;
+
+        soundPool.play(somDeFundo, 0.3f, 0.3f, 0, -1, 1f);
 
         handler.removeCallbacksAndMessages(null);
 
